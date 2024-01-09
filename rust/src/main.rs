@@ -1,4 +1,6 @@
 use clap::Parser;
+
+use crate::token::Lexer;
 mod error;
 mod token;
 
@@ -42,6 +44,13 @@ fn run_prompt() {
 }
 
 fn run(content: String) {
-    let tokens: Vec<token::Token> = token::Token::scan_content(&content);
+    let mut lexer = token::Lexer {
+        tokens: vec![],
+        source: &content,
+        current: 0,
+        start: 0,
+        line: 1,
+    };
+    let tokens = lexer.scan_content();
     println!("{tokens:?}");
 }
