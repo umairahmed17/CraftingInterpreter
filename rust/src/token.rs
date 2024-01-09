@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::error::{self, error};
 
 #[derive(Debug, Clone, Copy)]
@@ -25,7 +27,7 @@ enum TokenType<'a> {
     LessEqual,
 
     // Literals.
-    Identifier,
+    Identifier(&'a str),
     QuotedString(&'a str),
     Number(usize),
 
@@ -210,7 +212,12 @@ impl<'a> Lexer<'a> {
 
     fn advance(&mut self) -> char {
         let ch = self.source.chars().collect::<Vec<char>>();
-        self.current += 1;
+        let length = ch.len();
+        if self.current == length {
+            panic!("The length exceeded.");
+        } else {
+            self.current += 1;
+        }
         return *ch.get(self.current - 1).unwrap();
     }
 
@@ -252,7 +259,9 @@ impl<'a> Lexer<'a> {
         if self.is_at_end() {
             return '\0';
         }
-        return self.source.chars().next().unwrap();
+        let ch = self.source.chars().collect::<Vec<char>>();
+        let c = ch.get(self.current).unwrap_or(&'\0');
+        return *c;
     }
 
     fn handle_string(&mut self) {
@@ -277,10 +286,12 @@ impl<'a> Lexer<'a> {
     }
 
     fn identifier(&mut self) {
-        while self.peek().is_alphabetic() {
-            self.advance();
+        let mut c = self.peek();
+        while c.is_ascii_uppercase() || c.is_ascii_lowercase() || c == '_' {
+            c = self.advance();
         }
-        let text: &str = &self.source[self.start..self.current];
+        let text: &str = &self.source[self.start..self.current - 1];
+        println!("{text:?}");
         let token_type = KEYWORDS.iter().find(|(x, _)| *x == text);
         match token_type {
             Some((_, token_type)) => self
@@ -288,7 +299,7 @@ impl<'a> Lexer<'a> {
                 .push(Token::generate_token(*token_type, self.line)),
             None => self
                 .tokens
-                .push(Token::generate_token(TokenType::Identifier, self.line)),
+                .push(Token::generate_token(TokenType::Identifier(text), self.line)),
         }
     }
 }
