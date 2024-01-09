@@ -1,9 +1,7 @@
-use std::process::exit;
-
 use crate::error::{self, error};
 
-#[derive(Debug)]
-enum TokenType {
+#[derive(Debug, Clone, Copy)]
+enum TokenType<'a> {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -27,8 +25,8 @@ enum TokenType {
     LessEqual,
 
     // Literals.
-    Identifier(String),
-    QuotedString(String),
+    Identifier,
+    QuotedString(&'a str),
     Number(usize),
 
     // Keywords.
@@ -52,39 +50,40 @@ enum TokenType {
     EOF,
 }
 
-impl From<String> for TokenType {
-    fn from(other: String) -> Self {
-        return TokenType::Identifier(other);
-    }
-}
-
-impl<'a> From<&'a str> for TokenType {
-    fn from(value: &'a str) -> Self {
-        return TokenType::Identifier(value.to_string());
-    }
-}
-
-impl From<usize> for TokenType {
-    fn from(other: usize) -> TokenType {
-        TokenType::Number(other)
-    }
-}
-
 #[derive(Debug)]
-pub struct Token {
-    token_type: TokenType,
+pub struct Token<'a> {
+    token_type: TokenType<'a>,
     line: usize,
 }
 
-impl Token {
-    fn generate_token(token_type: TokenType, line: usize) -> Self {
+impl<'a> Token<'a> {
+    fn generate_token(token_type: TokenType<'a>, line: usize) -> Self {
         return Token { token_type, line };
     }
 }
 
+const KEYWORDS: [(&str, TokenType); 16] = [
+    ("while", TokenType::While),
+    ("var", TokenType::Var),
+    ("true", TokenType::True),
+    ("this", TokenType::This),
+    ("super", TokenType::Super),
+    ("return", TokenType::Return),
+    ("print", TokenType::Print),
+    ("or", TokenType::Or),
+    ("nil", TokenType::Nil),
+    ("if", TokenType::If),
+    ("for", TokenType::For),
+    ("fn", TokenType::Fun),
+    ("false", TokenType::False),
+    ("else", TokenType::Else),
+    ("class", TokenType::Class),
+    ("and", TokenType::And),
+];
+
 #[derive(Debug)]
 pub struct Lexer<'a> {
-    pub tokens: Vec<Token>,
+    pub tokens: Vec<Token<'a>>,
     pub source: &'a str,
     pub current: usize,
     pub start: usize,
@@ -197,7 +196,15 @@ impl<'a> Lexer<'a> {
             ' ' | '\r' | '\t' => (),
             '\n' => self.line += 1,
             '"' => self.handle_string(),
-            _ => error(self.line, "Unexpected character"),
+            _ => {
+                if self.peek().is_digit(10) {
+                    self.number();
+                } else if self.peek().is_alphabetic() {
+                    self.identifier();
+                } else {
+                    error(self.line, "Unexpected character");
+                }
+            }
         }
     }
 
@@ -217,6 +224,28 @@ impl<'a> Lexer<'a> {
         }
 
         return true;
+    }
+
+    fn number(&mut self) {
+        while self.peek().is_digit(10) {
+            self.advance();
+        }
+
+        if self.peek() == '.' && self.peek().is_digit(10) {
+            self.advance();
+            while self.peek().is_digit(10) {
+                self.advance();
+            }
+        }
+
+        self.tokens.push(Token::generate_token(
+            TokenType::Number(
+                self.source[self.start..self.current]
+                    .parse::<usize>()
+                    .unwrap(),
+            ),
+            self.line,
+        ));
     }
 
     fn peek(&mut self) -> char {
@@ -240,10 +269,26 @@ impl<'a> Lexer<'a> {
 
         self.advance();
 
-        let value: String = self.source[self.start + 1..self.current - 1].to_string();
+        let value = &self.source[self.start + 1..self.current - 1];
         self.tokens.push(Token::generate_token(
-            TokenType::QuotedString(value),
+            TokenType::QuotedString(&value),
             self.line,
         ));
+    }
+
+    fn identifier(&mut self) {
+        while self.peek().is_alphabetic() {
+            self.advance();
+        }
+        let text: &str = &self.source[self.start..self.current];
+        let token_type = KEYWORDS.iter().find(|(x, _)| *x == text);
+        match token_type {
+            Some((_, token_type)) => self
+                .tokens
+                .push(Token::generate_token(*token_type, self.line)),
+            None => self
+                .tokens
+                .push(Token::generate_token(TokenType::Identifier, self.line)),
+        }
     }
 }
