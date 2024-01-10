@@ -1,6 +1,6 @@
-use core::panic;
+use std::{str::Chars, iter::Peekable};
 
-use crate::error::{self, error};
+use crate::error::error;
 
 #[derive(Debug, Clone, Copy)]
 enum TokenType<'a> {
@@ -87,6 +87,7 @@ const KEYWORDS: [(&str, TokenType); 16] = [
 pub struct Lexer<'a> {
     pub tokens: Vec<Token<'a>>,
     pub source: &'a str,
+    pub iter: Peekable<Chars<'a>>,
     pub current: usize,
     pub start: usize,
     pub line: usize,
@@ -94,6 +95,7 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn scan_content(&'a mut self) -> &Vec<Token> {
+        println!("The length of source is {0}", self.source.len());
         return self.scan_tokens();
     }
 
@@ -114,6 +116,10 @@ impl<'a> Lexer<'a> {
 
     fn scan_token(&mut self) -> () {
         let c = self.advance();
+        println!(
+            "The current character at {0} to be tokenize is: {c}",
+            self.current
+        );
         match c {
             '(' => self
                 .tokens
@@ -187,7 +193,7 @@ impl<'a> Lexer<'a> {
             }
             '/' => {
                 if self.r#match('/') {
-                    while self.peek() != '\n' && !self.is_at_end() {
+                    while *self.iter.peek().unwrap_or(&'\0') != '\n' && !self.is_at_end() {
                         self.advance();
                     }
                 }
@@ -199,11 +205,12 @@ impl<'a> Lexer<'a> {
             '\n' => self.line += 1,
             '"' => self.handle_string(),
             _ => {
-                if self.peek().is_digit(10) {
+                if c.is_numeric() {
                     self.number();
-                } else if self.peek().is_alphabetic() {
+                } else if c.is_alphabetic() {
                     self.identifier();
                 } else {
+                    // println!("Maybe a number {c:?}: {0}", c.is_numeric());
                     error(self.line, "Unexpected character");
                 }
             }
@@ -211,14 +218,8 @@ impl<'a> Lexer<'a> {
     }
 
     fn advance(&mut self) -> char {
-        let ch = self.source.chars().collect::<Vec<char>>();
-        let length = ch.len();
-        if self.current == length {
-            panic!("The length exceeded.");
-        } else {
-            self.current += 1;
-        }
-        return *ch.get(self.current - 1).unwrap();
+        self.current += 1;
+        return self.iter.next().unwrap_or('\0');
     }
 
     fn r#match(&mut self, expected: char) -> bool {
@@ -234,17 +235,20 @@ impl<'a> Lexer<'a> {
     }
 
     fn number(&mut self) {
-        while self.peek().is_digit(10) {
+        while self.iter.peek().unwrap_or(&'\0').is_numeric() {
             self.advance();
         }
 
-        if self.peek() == '.' && self.peek().is_digit(10) {
-            self.advance();
-            while self.peek().is_digit(10) {
-                self.advance();
-            }
-        }
+        // if *self.iter.peek().unwrap_or(&'\0') == '.' && self.iter.nth(self.current + 1).unwrap_or('\0').is_numeric()
+        // {
+        //     self.advance();
+        //     while self.iter.peek().unwrap_or(&'\0').is_numeric() {
+        //         self.advance();
+        //     }
+        // }
 
+        let text = &self.source[self.start..self.current];
+        println!("The Number Text is: {text:?}");
         self.tokens.push(Token::generate_token(
             TokenType::Number(
                 self.source[self.start..self.current]
@@ -255,18 +259,9 @@ impl<'a> Lexer<'a> {
         ));
     }
 
-    fn peek(&mut self) -> char {
-        if self.is_at_end() {
-            return '\0';
-        }
-        let ch = self.source.chars().collect::<Vec<char>>();
-        let c = ch.get(self.current).unwrap_or(&'\0');
-        return *c;
-    }
-
     fn handle_string(&mut self) {
-        while self.peek() != '"' && !self.is_at_end() {
-            if self.peek() == '\n' {
+        while *self.iter.peek().unwrap_or(&'\0') != '"' && !self.is_at_end() {
+            if *self.iter.peek().unwrap_or(&'\0') == '\n' {
                 self.line += self.line;
             }
             self.advance();
@@ -286,20 +281,24 @@ impl<'a> Lexer<'a> {
     }
 
     fn identifier(&mut self) {
-        let mut c = self.peek();
-        while c.is_ascii_uppercase() || c.is_ascii_lowercase() || c == '_' {
-            c = self.advance();
+        loop {
+            let c = self.iter.peek().unwrap_or(&'\0');
+            if c.is_ascii_uppercase() || c.is_ascii_lowercase() || *c == '_' {
+                self.advance();
+            } else {
+                break;
+            }
         }
-        let text: &str = &self.source[self.start..self.current - 1];
-        println!("{text:?}");
+        let text: &str = &self.source[self.start..self.current];
         let token_type = KEYWORDS.iter().find(|(x, _)| *x == text);
         match token_type {
             Some((_, token_type)) => self
                 .tokens
                 .push(Token::generate_token(*token_type, self.line)),
-            None => self
-                .tokens
-                .push(Token::generate_token(TokenType::Identifier(text), self.line)),
+            None => self.tokens.push(Token::generate_token(
+                TokenType::Identifier(text),
+                self.line,
+            )),
         }
     }
 }

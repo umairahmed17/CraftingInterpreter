@@ -47,6 +47,7 @@ fn run(content: String) {
     let mut lexer = token::Lexer {
         tokens: vec![],
         source: &content,
+        iter: content.chars().peekable(),
         current: 0,
         start: 0,
         line: 1,
