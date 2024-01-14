@@ -1,5 +1,6 @@
 mod expr;
 mod scanner;
+pub mod parser;
 
 use clap::Parser;
 use expr::{BinaryOp, Expr, Literal};
