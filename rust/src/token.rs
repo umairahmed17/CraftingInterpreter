@@ -1,9 +1,9 @@
-use std::{str::Chars, iter::Peekable};
+use std::{fmt::Display, iter::Peekable, str::Chars};
 
 use crate::error::error;
 
 #[derive(Debug, Clone, Copy)]
-enum TokenType<'a> {
+pub enum TokenType<'a> {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -52,14 +52,149 @@ enum TokenType<'a> {
     EOF,
 }
 
+impl<'a> Display for TokenType<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TokenType::LeftParen => {
+                return write!(f, "left paren");
+            }
+            TokenType::RightParen => {
+                return write!(f, "right paren");
+            }
+            TokenType::LeftBrace => {
+                return write!(f, "left brace");
+            }
+            TokenType::RightBrace => {
+                return write!(f, "right brace");
+            }
+            TokenType::Comma => {
+                return write!(f, "comma");
+            }
+            TokenType::Dot => {
+                return write!(f, "dot");
+            }
+            TokenType::Minus => {
+                return write!(f, "minus");
+            }
+            TokenType::Plus => {
+                return write!(f, "plus");
+            }
+            TokenType::Semicolon => {
+                return write!(f, "semicolon");
+            }
+            TokenType::Slash => {
+                return write!(f, "slash");
+            }
+            TokenType::Star => {
+                return write!(f, "star");
+            }
+            TokenType::Bang => {
+                return write!(f, "bang");
+            }
+            TokenType::BangEqual => {
+                return write!(f, "BangEqual");
+            }
+            TokenType::Equal => {
+                return write!(f, "Equal");
+            }
+            TokenType::EqualEqual => {
+                return write!(f, "EqualEqual");
+            }
+            TokenType::Greater => {
+                return write!(f, "Greater");
+            }
+            TokenType::GreaterEqual => {
+                return write!(f, "GreaterEqual");
+            }
+            TokenType::Less => {
+                return write!(f, "Less");
+            }
+            TokenType::LessEqual => {
+                return write!(f, "LessEqual");
+            }
+            TokenType::Identifier(_) => {
+                return write!(f, "Identifie");
+            }
+            TokenType::QuotedString(_) => {
+                return write!(f, "QuotedStrin");
+            }
+            TokenType::Number(_) => {
+                return write!(f, "Numbe");
+            }
+            TokenType::And => {
+                return write!(f, "And");
+            }
+            TokenType::Class => {
+                return write!(f, "Class");
+            }
+            TokenType::Else => {
+                return write!(f, "Else");
+            }
+            TokenType::False => {
+                return write!(f, "False");
+            }
+            TokenType::Fun => {
+                return write!(f, "Fun");
+            }
+            TokenType::For => {
+                return write!(f, "For");
+            }
+            TokenType::If => {
+                return write!(f, "If");
+            }
+            TokenType::Nil => {
+                return write!(f, "Nil");
+            }
+            TokenType::Or => {
+                return write!(f, "Or");
+            }
+            TokenType::Print => {
+                return write!(f, "Print");
+            }
+            TokenType::Return => {
+                return write!(f, "Return");
+            }
+            TokenType::Super => {
+                return write!(f, "Super");
+            }
+            TokenType::This => {
+                return write!(f, "This");
+            }
+            TokenType::True => {
+                return write!(f, "True");
+            }
+            TokenType::Var => {
+                return write!(f, "Var");
+            }
+            TokenType::While => {
+                return write!(f, "While");
+            }
+            TokenType::EOF => {
+                return write!(f, "EOF");
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Token<'a> {
     token_type: TokenType<'a>,
     line: usize,
 }
 
+impl<'a> Display for Token<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Token {{ token_type: {0}, line: {1} }}",
+            self.token_type, self.line
+        );
+        return Ok(());
+    }
+}
+
 impl<'a> Token<'a> {
-    fn generate_token(token_type: TokenType<'a>, line: usize) -> Self {
+    pub fn generate_token(token_type: TokenType<'a>, line: usize) -> Self {
         return Token { token_type, line };
     }
 }

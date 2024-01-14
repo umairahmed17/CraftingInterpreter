@@ -1,10 +1,9 @@
+mod expr;
+mod scanner;
+
 use clap::Parser;
-
-use crate::token::Lexer;
-mod error;
-mod token;
-
-static mut HAD_ERROR: bool = false;
+use expr::{BinaryOp, Expr, Literal};
+use scanner::{scan_tokens, Token};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,11 +23,6 @@ fn main() {
 fn run_file(file: &str) {
     let content = std::fs::read_to_string(file).expect("Failed to read file");
     run(content);
-    unsafe {
-        if HAD_ERROR {
-            std::process::exit(65);
-        }
-    }
 }
 
 fn run_prompt() {
@@ -37,21 +31,13 @@ fn run_prompt() {
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
         run(input);
-        unsafe {
-            HAD_ERROR = false;
-        }
     }
 }
 
 fn run(content: String) {
-    let mut lexer = token::Lexer {
-        tokens: vec![],
-        source: &content,
-        iter: content.chars().peekable(),
-        current: 0,
-        start: 0,
-        line: 1,
-    };
-    let tokens = lexer.scan_content();
-    println!("{tokens:?}");
+    let tokens = scan_tokens(content);
+    match tokens {
+        Ok(tokens) => println!("{tokens:?}"),
+        Err(e) => print!("{e:?}\n"),
+    }
 }
