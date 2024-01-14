@@ -1,3 +1,7 @@
+use core::panic;
+
+use crate::scanner::{Token};
+
 #[derive(Debug, Clone)]
 pub enum Expr {
     Literal(Literal),
@@ -92,6 +96,24 @@ pub struct UnaryOp {
     pub col: i64,
 }
 
+impl UnaryOp {
+    pub(crate) fn from_token(current: &Token) -> UnaryOp {
+        return match current.ty {
+            crate::scanner::TokenType::Minus => Self {
+                ty: UnaryOpTy::Minus,
+                line: current.line,
+                col: current.col,
+            },
+            crate::scanner::TokenType::Bang => Self {
+                ty: UnaryOpTy::Bang,
+                line: current.line,
+                col: current.col,
+            },
+            _ => panic!("this was not supposed to happen! This token `{current:?}` is not a `BinaryOpTy`"),
+        };
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum BinaryOpTy {
     EqualEqual,
@@ -111,6 +133,66 @@ pub struct BinaryOp {
     pub ty: BinaryOpTy,
     pub line: usize,
     pub col: i64,
+}
+
+impl BinaryOp {
+    pub fn from_token(value: &Token) -> Self {
+        match value.ty {
+            crate::scanner::TokenType::Minus => Self {
+                ty: BinaryOpTy::Minus,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::Plus => Self {
+                ty: BinaryOpTy::Plus,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::Slash => Self {
+                ty: BinaryOpTy::Slash,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::Star => Self {
+                ty: BinaryOpTy::Star,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::BangEqual => Self {
+                ty: BinaryOpTy::NotEqual,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::EqualEqual => Self {
+                ty: BinaryOpTy::EqualEqual,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::Greater => Self {
+                ty: BinaryOpTy::Greater,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::GreaterEqual => Self {
+                ty: BinaryOpTy::GreaterEqual,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::Less => Self {
+                ty: BinaryOpTy::Less,
+                line: value.line,
+                col: value.col,
+            },
+            crate::scanner::TokenType::LessEqual => Self {
+                ty: BinaryOpTy::LessEqual,
+                line: value.line,
+                col: value.col,
+            },
+            _ => panic!(
+                "this was not supposed to happen! This token `{value:?}` is not a `BinaryOpTy`"
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

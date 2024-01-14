@@ -1,9 +1,12 @@
+mod error;
 mod expr;
+mod parser;
 mod scanner;
-pub mod parser;
 
 use clap::Parser;
+use error::Error;
 use expr::{BinaryOp, Expr, Literal};
+use parser::LoxParser;
 use scanner::{scan_tokens, Token};
 
 #[derive(Parser, Debug)]
@@ -38,7 +41,15 @@ fn run_prompt() {
 fn run(content: String) {
     let tokens = scan_tokens(content);
     match tokens {
-        Ok(tokens) => println!("{tokens:?}"),
+        Ok(tokens) => {
+            let mut parser = LoxParser { tokens, current: 0 };
+            match parser.parse() {
+                Ok(expr) => println!("{expr:?}"),
+                Err(err) => {
+                    println!("{err:?}");
+                }
+            }
+        }
         Err(e) => print!("{e:?}\n"),
     }
 }
