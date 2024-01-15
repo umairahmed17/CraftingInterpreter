@@ -44,7 +44,10 @@ fn run(content: String) {
         Ok(tokens) => {
             let mut parser = LoxParser { tokens, current: 0 };
             match parser.parse() {
-                Ok(expr) => println!("{expr:?}"),
+                Ok(expr) => {
+                    println!("{expr:?}");
+                    Expr::interpret(expr);
+                },
                 Err(err) => {
                     println!("{err:?}");
                 }

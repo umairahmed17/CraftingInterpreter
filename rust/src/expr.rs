@@ -1,6 +1,7 @@
-use core::panic;
+use core::{fmt, panic};
+use std::str::FromStr;
 
-use crate::scanner::{Token};
+use crate::{error::Error, scanner::Token};
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -29,6 +30,162 @@ pub enum Expr {
     //     source_location: SourceLocation,
     // },
     // Lambda(LambdaDecl),
+}
+
+#[derive(Debug, Clone)]
+pub enum Value {
+    String(String),
+    Number(f64),
+    Bool(bool),
+    Nil,
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::String(s) => write!(f, "{}", s),
+            Value::Number(v) => write!(f, "{}", v),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::Nil => write!(f, "Nil"),
+        }
+    }
+}
+
+impl Expr {
+    fn get_value(&self) -> Result<Value, Error> {
+        match self {
+            Expr::Literal(val) => match val {
+                Literal::Number(val) => Ok(Value::Number(*val)),
+                Literal::String(val) => Ok(Value::String(val.to_string())),
+                Literal::True => Ok(Value::Bool(true)),
+                Literal::False => Ok(Value::Bool(true)),
+                Literal::Nil => Ok(Value::Nil),
+            },
+            Expr::Unary(op, expr) => {
+                let right: Value = expr.get_value()?;
+                match op.ty {
+                    UnaryOpTy::Minus => {
+                        if let Value::Number(v) = right {
+                            return Ok(Value::Number(-v));
+                        }
+                        let message = "Wrong Unary Token In {op:?} with {expr:?}";
+                        return Err(Error::RunTimeException {
+                            message: String::from(message),
+                            line: op.line,
+                            col: op.col,
+                        });
+                    }
+                    UnaryOpTy::Bang => {
+                        if let Value::Number(v) = right {
+                            return Ok(Value::Bool(is_truthy(v)));
+                        }
+                        let message = "Wrong Unary Token In {op:?} with {expr:?}";
+                        return Err(Error::RunTimeException {
+                            message: String::from(message),
+                            line: op.line,
+                            col: op.col,
+                        });
+                    }
+                }
+            }
+            Expr::Binary(left_expr, op, right_expr) => {
+                let right = right_expr.get_value()?;
+                let left = left_expr.get_value()?;
+
+                if let Value::Number(l) = left {
+                    if let Value::Number(r) = right {
+                        match op.ty {
+                            BinaryOpTy::EqualEqual => return Ok(Value::Bool(l == r)),
+                            BinaryOpTy::NotEqual => return Ok(Value::Bool(l != r)),
+                            BinaryOpTy::Less => return Ok(Value::Bool(l < r)),
+                            BinaryOpTy::LessEqual => return Ok(Value::Bool(l <= r)),
+                            BinaryOpTy::Greater => return Ok(Value::Bool(l > r)),
+                            BinaryOpTy::GreaterEqual => return Ok(Value::Bool(l >= r)),
+                            BinaryOpTy::Plus => return Ok(Value::Number(l + r)),
+                            BinaryOpTy::Minus => return Ok(Value::Number(l - r)),
+                            BinaryOpTy::Star => return Ok(Value::Number(l * r)),
+                            BinaryOpTy::Slash => return Ok(Value::Number(l / r)),
+                        }
+                    }
+                }
+                if let Value::String(ref l) = left {
+                    if let Value::String(r) = right {
+                        match op.ty {
+                            BinaryOpTy::Plus => {
+                                let mut s = l.to_owned();
+                                s.push_str(&r);
+                                return Ok(Value::String(s));
+                            }
+                            _ => {
+                                let message = "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                                return Err(Error::RunTimeException {
+                                    message: String::from(message),
+                                    line: op.line,
+                                    col: op.col,
+                                });
+                            }
+                        }
+                    }
+                }
+                if let Value::Bool(l) = left {
+                    if let Value::Bool(r) = right {
+                        match op.ty {
+                            BinaryOpTy::EqualEqual => return Ok(Value::Bool(l == r)),
+                            BinaryOpTy::NotEqual => return Ok(Value::Bool(l != r)),
+                            _ => {
+                                let message = "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                                return Err(Error::RunTimeException {
+                                    message: String::from(message),
+                                    line: op.line,
+                                    col: op.col,
+                                });
+                            }
+                        }
+                    }
+                }
+                if let Value::Nil = left {
+                    if let Value::Nil = right {
+                        match op.ty {
+                            BinaryOpTy::EqualEqual => return Ok(Value::Bool(true)),
+                            BinaryOpTy::NotEqual => return Ok(Value::Bool(false)),
+                            _ => {
+                                let message = "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                                return Err(Error::RunTimeException {
+                                    message: String::from(message),
+                                    line: op.line,
+                                    col: op.col,
+                                });
+                            }
+                        }
+                    }
+                }
+                let message = "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                return Err(Error::RunTimeException {
+                    message: String::from(message),
+                    line: op.line,
+                    col: op.col,
+                });
+            }
+            Expr::Grouping(expr) => return expr.get_value(),
+        }
+    }
+
+    pub fn interpret(expr: Expr) {
+        let value = expr.get_value();
+        match value {
+            Ok(v) => {
+                println!("{v:?}");
+            }
+            Err(e) => println!("{e:?}"),
+        }
+    }
+}
+
+fn is_truthy(v: f64) -> bool {
+    if v > 0.0 {
+        return true;
+    }
+    return false;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -109,7 +266,9 @@ impl UnaryOp {
                 line: current.line,
                 col: current.col,
             },
-            _ => panic!("this was not supposed to happen! This token `{current:?}` is not a `BinaryOpTy`"),
+            _ => panic!(
+                "this was not supposed to happen! This token `{current:?}` is not a `BinaryOpTy`"
+            ),
         };
     }
 }

@@ -134,7 +134,7 @@ impl LoxParser {
         }
         if self.match_one_of(vec![TokenType::LeftParen]) {
             let expr: Expr = self.expr()?;
-            self.consume(TokenType::RightParen, "Expect `)` after expression.");
+            let _ = self.consume(TokenType::RightParen, "Expect `)` after expression.");
             return Ok(Expr::Grouping(Box::new(expr)));
         }
 

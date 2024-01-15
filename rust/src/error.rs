@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::scanner;
+use crate::{expr::Expr, scanner};
 
 // use std::io::{self, Write};
 //
@@ -57,6 +57,11 @@ pub enum Error {
     },
     InvalidTokenInBinaryOp {
         token_type: scanner::TokenType,
+        line: usize,
+        col: i64,
+    },
+    RunTimeException {
+        message: String,
         line: usize,
         col: i64,
     },
@@ -129,6 +134,11 @@ impl fmt::Debug for Error {
                 f,
                 "invalid token in binary op {:?} at line={},col={}",
                 token_type, line, col
+            ),
+            Error::RunTimeException { message, line, col } => write!(
+                f,
+                "Invalid exceptions {message:?} at line={},col={}",
+                line, col
             ),
         }
     }
