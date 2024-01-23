@@ -1,13 +1,15 @@
 mod error;
 mod expr;
+mod interpreter;
 mod parser;
 mod scanner;
 
 use clap::Parser;
-use error::Error;
-use expr::{BinaryOp, Expr, Literal};
+use expr::Expr;
 use parser::LoxParser;
 use scanner::{scan_tokens, Token};
+
+use crate::interpreter::interpret;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -43,14 +45,15 @@ fn run(content: String) {
     match tokens {
         Ok(tokens) => {
             let mut parser = LoxParser { tokens, current: 0 };
-            match parser.parse() {
-                Ok(expr) => {
-                    println!("{expr:?}");
-                    Expr::interpret(expr);
-                },
-                Err(err) => {
-                    println!("{err:?}");
-                }
+            let stmts = parser.parse();
+            if let Err(e) = stmts {
+                println!("{e:?}");
+                return;
+            }
+            println!("{stmts:?}");
+            if let Err(e) = interpret(stmts.unwrap()){
+                println!("{e:?}");
+                return;
             }
         }
         Err(e) => print!("{e:?}\n"),

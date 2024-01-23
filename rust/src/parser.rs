@@ -2,14 +2,14 @@ use std::rc::Rc;
 
 use crate::{
     error::Error,
-    expr::{BinaryOp, Expr, Literal, UnaryOp},
+    expr::{BinaryOp, Expr, Literal, Stmt, UnaryOp},
     scanner::{self, TokenType},
     Token,
 };
 
 pub struct LoxParser {
-   pub tokens: Vec<Token>,
-   pub current: usize,
+    pub tokens: Vec<Token>,
+    pub current: usize,
 }
 
 impl LoxParser {
@@ -182,7 +182,35 @@ impl LoxParser {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, Error> {
-        return self.expr();
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.is_at_end() {
+            statements.push(self.statement()?);
+        }
+        let expr = self.expr();
+        return Ok(statements);
+    }
+
+    fn statement(&mut self) -> Result<Stmt, Error> {
+        if self.match_one_of(vec![TokenType::Print]) {
+            return self.print_statement();
+        }
+        return self.expr_statement();
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt, Error> {
+        let value: Expr = self.expr().unwrap();
+        if let Err(res) = self.consume(TokenType::Semicolon, "Expect `;` after value") {
+            return Err(res);
+        }
+        return Ok(Stmt::Print(value));
+    }
+
+    fn expr_statement(&mut self) -> Result<Stmt, Error> {
+        let value: Expr = self.expr().unwrap();
+        if let Err(res) = self.consume(TokenType::Semicolon, "Expect `;` after expression") {
+            return Err(res);
+        }
+        return Ok(Stmt::Expr(value));
     }
 }

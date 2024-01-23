@@ -52,7 +52,7 @@ impl fmt::Display for Value {
 }
 
 impl Expr {
-    fn get_value(&self) -> Result<Value, Error> {
+    pub fn get_value(&self) -> Result<Value, Error> {
         match self {
             Expr::Literal(val) => match val {
                 Literal::Number(val) => Ok(Value::Number(*val)),
@@ -170,15 +170,6 @@ impl Expr {
         }
     }
 
-    pub fn interpret(expr: Expr) {
-        let value = expr.get_value();
-        match value {
-            Ok(v) => {
-                println!("{v:?}");
-            }
-            Err(e) => println!("{e:?}"),
-        }
-    }
 }
 
 fn is_truthy(v: f64) -> bool {
