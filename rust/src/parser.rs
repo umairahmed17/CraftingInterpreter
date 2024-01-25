@@ -1,8 +1,6 @@
-use std::rc::Rc;
-
 use crate::{
     error::Error,
-    expr::{BinaryOp, Expr, Literal, Stmt, UnaryOp},
+    expr::{BinaryOp, Expr, Literal, Stmt, Symbol, UnaryOp},
     scanner::{self, TokenType},
     Token,
 };
@@ -132,6 +130,16 @@ impl LoxParser {
                 None => panic!("internal error in parser: when parsing number, found no literal"),
             }
         }
+        if self.match_one_of(vec![TokenType::Identifier]) {
+            let name = &self.tokens[self.current - 1];
+            let symbol_name = String::from_utf8(name.lexeme.clone()).unwrap();
+            let name = Symbol {
+                name: symbol_name,
+                line: name.line,
+                col: name.col,
+            };
+            return Ok(Expr::Variable(name));
+        }
         if self.match_one_of(vec![TokenType::LeftParen]) {
             let expr: Expr = self.expr()?;
             let _ = self.consume(TokenType::RightParen, "Expect `)` after expression.");
@@ -185,9 +193,10 @@ impl LoxParser {
     pub fn parse(&mut self) -> Result<Vec<Stmt>, Error> {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
         let expr = self.expr();
+        println!("{expr:?}");
         return Ok(statements);
     }
 
@@ -212,5 +221,39 @@ impl LoxParser {
             return Err(res);
         }
         return Ok(Stmt::Expr(value));
+    }
+
+    fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.match_one_of(vec![TokenType::Var]) {
+            let stmt = self.var_declaration();
+            if let Err(_) = stmt {
+                self.synchronize();
+            }
+            return stmt;
+        }
+        let stmt = self.statement();
+        if let Err(_) = stmt {
+            self.synchronize();
+        }
+        return stmt;
+    }
+
+    fn var_declaration(&mut self) -> Result<Stmt, Error> {
+        let name = self.consume(TokenType::Identifier, "Expect variable name")?;
+        let symbol_name = String::from_utf8(name.lexeme).unwrap();
+        let name = Symbol {
+            name: symbol_name,
+            line: name.line,
+            col: name.col,
+        };
+        let mut initializer: Option<Expr> = None;
+        if self.match_one_of(vec![TokenType::Equal]) {
+            initializer = Some(self.expr()?);
+        }
+        let _ = self.consume(
+            TokenType::Semicolon,
+            "Expect `;` after variable declaration",
+        );
+        return Ok(Stmt::VarDecl(name, initializer));
     }
 }

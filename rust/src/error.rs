@@ -65,6 +65,7 @@ pub enum Error {
         line: usize,
         col: i64,
     },
+    JustError,
 }
 
 impl fmt::Debug for Error {
@@ -140,6 +141,7 @@ impl fmt::Debug for Error {
                 "Invalid exceptions {message:?} at line={},col={}",
                 line, col
             ),
+            Error::JustError => write!(f, "Something Went wrong!"),
         }
     }
 }

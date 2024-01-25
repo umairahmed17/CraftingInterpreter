@@ -1,15 +1,18 @@
+mod env;
 mod error;
 mod expr;
 mod interpreter;
 mod parser;
 mod scanner;
 
+use std::collections::HashMap;
+
 use clap::Parser;
-use expr::Expr;
+use env::Environment;
 use parser::LoxParser;
 use scanner::{scan_tokens, Token};
 
-use crate::interpreter::interpret;
+use crate::interpreter::Interpreter;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -45,13 +48,14 @@ fn run(content: String) {
     match tokens {
         Ok(tokens) => {
             let mut parser = LoxParser { tokens, current: 0 };
-            let stmts = parser.parse();
-            if let Err(e) = stmts {
-                println!("{e:?}");
-                return;
-            }
-            println!("{stmts:?}");
-            if let Err(e) = interpret(stmts.unwrap()){
+            let stmts = parser.parse().unwrap();
+            let mut interpreter = Interpreter {
+                statements: &stmts,
+                env: Environment {
+                    values: HashMap::new(),
+                },
+            };
+            if let Err(e) = interpreter.interpret() {
                 println!("{e:?}");
                 return;
             }

@@ -12,7 +12,7 @@ pub enum Expr {
     // Call(Box<Expr>, SourceLocation, Vec<Expr>),
     // Get(Box<Expr>, Symbol),
     Grouping(Box<Expr>),
-    // Variable(Symbol),
+    Variable(Symbol),
     // Assign(Symbol, Box<Expr>),
     // Logical(Box<Expr>, LogicalOp, Box<Expr>),
     // Set(Box<Expr>, Symbol, Box<Expr>),
@@ -167,6 +167,7 @@ impl Expr {
                 });
             }
             Expr::Grouping(expr) => return expr.get_value(),
+            _ => return Err(Error::JustError)
         }
     }
 
