@@ -13,7 +13,7 @@ pub enum Expr {
     // Get(Box<Expr>, Symbol),
     Grouping(Box<Expr>),
     Variable(Symbol),
-    // Assign(Symbol, Box<Expr>),
+    Assign(Symbol, Box<Expr>),
     // Logical(Box<Expr>, LogicalOp, Box<Expr>),
     // Set(Box<Expr>, Symbol, Box<Expr>),
     // Super(SourceLocation, Symbol),
@@ -108,6 +108,7 @@ impl Expr {
                         }
                     }
                 }
+                println!("Left: {left}, Right: {right}, Token: {op:?}");
                 if let Value::String(ref l) = left {
                     if let Value::String(r) = right {
                         match op.ty {
@@ -167,7 +168,13 @@ impl Expr {
                 });
             }
             Expr::Grouping(expr) => return expr.get_value(),
-            _ => return Err(Error::JustError)
+            Expr::Assign(_symbol, expr) => {
+                return expr.get_value();
+            }
+            Expr::Variable(v) => {
+                
+            }
+            _ => return Ok(Value::Nil)
         }
     }
 
@@ -227,6 +234,7 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Print(Expr),
     VarDecl(Symbol, Option<Expr>),
+    Assign(Symbol, Box<Stmt>),
     Block(Vec<Stmt>),
     Return(SourceLocation, Option<Expr>),
     While(Expr, Box<Stmt>),

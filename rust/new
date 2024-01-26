@@ -1,5 +1,6 @@
-var language = "lox"
-var a = 2.3 + 3
-var c = 5 / a
-a = 4 * c
-// a comment:
+var language = "lox";
+var a = 1 + 2 * 3 / 3;
+print language;
+print a;
+language = language + " language";
+print language;

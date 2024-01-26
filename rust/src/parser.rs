@@ -12,7 +12,25 @@ pub struct LoxParser {
 
 impl LoxParser {
     fn expr(&mut self) -> Result<Expr, Error> {
-        return self.equality();
+        return self.assignment();
+    }
+
+    fn assignment(&mut self) -> Result<Expr, Error> {
+        let expr = self.equality()?;
+        if self.match_one_of(vec![TokenType::Equal]) {
+            let equals = &self.tokens[self.current - 1].clone(); // idk what i am doing
+            let value = self.assignment()?;
+
+            if let Expr::Variable(v) = expr {
+                return Ok(Expr::Assign(v, Box::new(value)));
+            }
+
+            return Err(Error::InvalidAssignment {
+                line: equals.line,
+                col: equals.col,
+            });
+        }
+        return Ok(expr);
     }
 
     fn equality(&mut self) -> Result<Expr, Error> {
@@ -195,8 +213,6 @@ impl LoxParser {
         while !self.is_at_end() {
             statements.push(self.declaration()?);
         }
-        let expr = self.expr();
-        println!("{expr:?}");
         return Ok(statements);
     }
 
