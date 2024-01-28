@@ -47,12 +47,9 @@ fn run_prompt() {
         let tokens = scan_tokens(input.clone());
         match tokens {
             Ok(tokens) => {
-                let mut parser = LoxParser { tokens, current: 0 };
+                let mut parser = LoxParser::from_tokens(tokens);
                 let stmts = parser.parse().unwrap();
-                let mut interpreter = Interpreter {
-                    statements: &stmts,
-                    env: environment.clone(),
-                };
+                let mut interpreter = Interpreter::from_statements(&stmts);
                 if let Err(e) = interpreter.interpret() {
                     println!("{e:?}");
                     return;
@@ -68,15 +65,9 @@ fn run(content: String) {
     let tokens = scan_tokens(content);
     match tokens {
         Ok(tokens) => {
-            let mut parser = LoxParser { tokens, current: 0 };
+            let mut parser = LoxParser::from_tokens(tokens);
             let stmts = parser.parse().unwrap();
-            let mut interpreter = Interpreter {
-                statements: &stmts,
-                env: Environment {
-                    values: HashMap::new(),
-                    enclosing: None,
-                },
-            };
+            let mut interpreter = Interpreter::from_statements(&stmts);
             if let Err(e) = interpreter.interpret() {
                 println!("{e:?}");
                 return;

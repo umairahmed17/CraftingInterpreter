@@ -100,6 +100,7 @@ pub enum Stmt {
     Block(Vec<Stmt>),
     Return(SourceLocation, Option<Expr>),
     While(Expr, Box<Stmt>),
+    Break,
 }
 
 #[derive(Debug, Copy, Clone)]

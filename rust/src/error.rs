@@ -68,6 +68,10 @@ pub enum Error {
     JustError {
         message: String,
     },
+    BreakNotInLoop {
+        line: usize,
+        col: i64,
+    },
 }
 
 impl fmt::Debug for Error {
@@ -144,6 +148,9 @@ impl fmt::Debug for Error {
                 line, col
             ),
             Error::JustError { message } => write!(f, "Something Went wrong!. {message}"),
+            Error::BreakNotInLoop { line, col } => {
+                write!(f, "Break not in loop at line={line},col={col}")
+            }
         }
     }
 }

@@ -8,9 +8,27 @@ use crate::{
 pub struct LoxParser {
     pub tokens: Vec<Token>,
     pub current: usize,
+    in_loop: bool,
+}
+
+impl Default for LoxParser {
+    fn default() -> Self {
+        return Self {
+            tokens: vec![],
+            current: 0,
+            in_loop: false,
+        };
+    }
 }
 
 impl LoxParser {
+    pub fn from_tokens(tokens: Vec<Token>) -> Self {
+        return Self {
+            tokens,
+            current: 0,
+            in_loop: false,
+        };
+    }
     fn expr(&mut self) -> Result<Expr, Error> {
         return self.assignment();
     }
@@ -240,6 +258,17 @@ impl LoxParser {
         if self.match_one_of(vec![TokenType::For]) {
             return self.for_statement();
         }
+        if self.match_one_of(vec![TokenType::Break]) {
+            println!("In Loop: {0}", self.in_loop);
+            if !self.in_loop {
+                return Err(Error::BreakNotInLoop {
+                    line: self.peek().line,
+                    col: self.peek().col,
+                });
+            }
+            let _ = self.consume(TokenType::Semicolon, "Expected `;` after break.");
+            return Ok(Stmt::Break);
+        }
         if self.match_one_of(vec![TokenType::If]) {
             return self.if_statement();
         }
@@ -327,14 +356,17 @@ impl LoxParser {
     }
 
     fn while_statement(&mut self) -> Result<Stmt, Error> {
+        self.in_loop = true;
         let _ = self.consume(TokenType::LeftParen, "Expect `(` after `if`.");
         let condition = self.expr()?;
         let _ = self.consume(TokenType::RightParen, "Expect `)` after `if`.");
         let while_branch = Box::new(self.statement()?);
+        self.in_loop = false;
         return Ok(Stmt::While(condition, while_branch));
     }
 
     fn for_statement(&mut self) -> Result<Stmt, Error> {
+        self.in_loop = true;
         let _ = self.consume(TokenType::LeftParen, "Expect `(` after `for`.");
         let mut initializer: Option<Stmt> = None;
         if self.match_one_of(vec![TokenType::Semicolon]) {
@@ -370,6 +402,7 @@ impl LoxParser {
             body = Stmt::Block(vec![initializer.unwrap(), body]);
         }
 
+        self.in_loop = false;
         return Ok(body);
     }
 }

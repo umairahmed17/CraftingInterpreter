@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::time::SystemTime;
+
 use crate::{
     env::Environment,
     error::Error,
@@ -7,9 +10,21 @@ use crate::{
 pub struct Interpreter<'a> {
     pub statements: &'a Vec<Stmt>,
     pub env: Environment,
+    loop_stack: Vec<String>,
 }
 
 impl<'a> Interpreter<'a> {
+    pub fn from_statements(statements: &'a Vec<Stmt>) -> Self {
+        let environment = Environment {
+            values: HashMap::new(),
+            enclosing: None,
+        };
+        return Self {
+            statements,
+            env: environment,
+            loop_stack: vec![],
+        };
+    }
     pub fn interpret(&mut self) -> Result<(), Error> {
         for stmt in self.statements {
             if let Err(res) = self.evaluate(stmt) {
@@ -47,6 +62,10 @@ impl<'a> Interpreter<'a> {
                 self.env = Environment::with_enclosing(self.env.clone());
 
                 for statement in statements {
+                    if let Stmt::Break = statement {
+                        self.loop_stack.pop();
+                        break;
+                    }
                     let _ = self.evaluate(statement)?;
                 }
                 if let Some(enclosing) = self.env.enclosing.clone() {
@@ -55,11 +74,15 @@ impl<'a> Interpreter<'a> {
                 return Ok(());
             }
             Stmt::While(condition, while_stmt) => {
-                println!(
-                    "Condition: {condition:?} And Value: {0:?}",
-                    self.get_value(condition)
-                );
-                while is_truthy(&self.get_value(condition)?)? {
+                let id = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs()
+                    .to_string();
+                self.loop_stack.push(id.clone());
+                while is_truthy(&self.get_value(condition)?)?
+                    && self.loop_stack.last().unwrap_or(&"None".to_string()) == &id
+                {
                     self.evaluate(while_stmt)?;
                 }
                 return Ok(());

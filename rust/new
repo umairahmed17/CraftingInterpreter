@@ -5,4 +5,15 @@ for (var b = 1; a < 10000; b = temp + b) {
   print a;
   temp = a;
   a = b;
+  if(a > 5){
+      break;
+  }
+}
+
+while(a > 5){
+    if(a > 8){
+        break;
+    }
+    a = a + 1;
+    print a;
 }

@@ -34,6 +34,9 @@ pub enum TokenType {
     Number,
 
     // Keywords.
+    // new
+    Break,
+    // end
     And,
     Class,
     Else,
@@ -142,6 +145,7 @@ impl Default for Scanner {
                 ("var", TokenType::Var),
                 ("while", TokenType::While),
                 ("lambda", TokenType::Lambda),
+                ("break", TokenType::Break),
             ]
             .into_iter()
             .map(|(k, v)| (String::from(k), v))
