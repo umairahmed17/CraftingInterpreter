@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     env::Environment,
     error::Error,
-    expr::{BinaryOp, BinaryOpTy, Expr, Literal, Stmt, UnaryOp, UnaryOpTy, Value},
+    expr::{BinaryOp, BinaryOpTy, Expr, Literal, LogicalOp, Stmt, UnaryOp, UnaryOpTy, Value},
 };
 
 pub struct Interpreter<'a> {
@@ -59,6 +59,36 @@ impl<'a> Interpreter<'a> {
                     },
                 );
             }
+            Stmt::If(condition, if_stmt, else_stmt) => {
+                let bool = self.get_value(condition)?;
+                let mut cond = false;
+                match bool {
+                    Value::String(_) => {
+                        let msg = "Cannot cast string to bool";
+                        return Err(Error::JustError {
+                            message: msg.to_string(),
+                        });
+                    }
+                    Value::Number(v) => {
+                        cond = is_truthy(v);
+                    }
+                    Value::Bool(v) => {
+                        cond = v;
+                    }
+                    Value::Nil => {
+                        let msg = "Cannot cast string to bool";
+                        return Err(Error::JustError {
+                            message: msg.to_string(),
+                        });
+                    }
+                }
+                if cond {
+                    self.evaluate(if_stmt)?;
+                } else if let Some(else_stmt) = else_stmt {
+                    self.evaluate(else_stmt)?;
+                }
+                return Ok(bool);
+            }
             _ => return Ok(Value::Nil),
         }
     }
@@ -85,6 +115,59 @@ impl<'a> Interpreter<'a> {
             Expr::Variable(v) => {
                 return self.env.get(&v);
             }
+            Expr::Logical(left, op, right) => {
+                let left = self.get_value(left)?;
+                if let LogicalOp::Or = op {
+                    match left {
+                        Value::String(_) => {
+                            return Err(Error::JustError {
+                                message: String::from("Cannot cast string to bool"),
+                            });
+                        }
+                        Value::Number(v) => {
+                            if is_truthy(v) {
+                                return Ok(left);
+                            }
+                        }
+                        Value::Bool(v) => {
+                            if v {
+                                return Ok(left);
+                            }
+                        }
+                        Value::Nil => {
+                            return Err(Error::JustError {
+                                message: String::from("Nil cannot be casted to bool"),
+                            })
+                        }
+                    }
+                }
+
+                if let LogicalOp::And = op {
+                    match left {
+                        Value::String(_) => {
+                            return Err(Error::JustError {
+                                message: String::from("Cannot cast string to bool"),
+                            });
+                        }
+                        Value::Number(v) => {
+                            if !is_truthy(v) {
+                                return Ok(left);
+                            }
+                        }
+                        Value::Bool(v) => {
+                            if !v {
+                                return Ok(left);
+                            }
+                        }
+                        Value::Nil => {
+                            return Err(Error::JustError {
+                                message: String::from("Nil cannot be casted to bool"),
+                            })
+                        }
+                    }
+                }
+                return self.get_value(right);
+            }
         }
     }
 
@@ -95,7 +178,7 @@ impl<'a> Interpreter<'a> {
                 if let Value::Number(v) = right {
                     return Ok(Value::Number(-v));
                 }
-                let message = "Wrong Unary Token In {op:?} with {expr:?}";
+                let message = format!("Wrong Unary Token In {op:?} with {right:?}");
                 return Err(Error::RunTimeException {
                     message: String::from(message),
                     line: op.line,
@@ -142,16 +225,19 @@ impl<'a> Interpreter<'a> {
             }
         }
         if let Value::String(ref l) = left {
-            if let Value::String(r) = right {
+            if let Value::String(ref r) = right {
                 match op.ty {
                     BinaryOpTy::Plus => {
                         let mut s = l.to_owned();
                         s.push_str(&r);
                         return Ok(Value::String(s));
                     }
+                    BinaryOpTy::EqualEqual => return Ok(Value::Bool(l == r)),
+                    BinaryOpTy::NotEqual => return Ok(Value::Bool(l != r)),
                     _ => {
-                        let message =
-                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                        let message = format!(
+                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}"
+                        );
                         return Err(Error::RunTimeException {
                             message: String::from(message),
                             line: op.line,
@@ -167,8 +253,9 @@ impl<'a> Interpreter<'a> {
                     BinaryOpTy::EqualEqual => return Ok(Value::Bool(l == r)),
                     BinaryOpTy::NotEqual => return Ok(Value::Bool(l != r)),
                     _ => {
-                        let message =
-                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                        let message = format!(
+                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}"
+                        );
                         return Err(Error::RunTimeException {
                             message: String::from(message),
                             line: op.line,
@@ -184,8 +271,9 @@ impl<'a> Interpreter<'a> {
                     BinaryOpTy::EqualEqual => return Ok(Value::Bool(true)),
                     BinaryOpTy::NotEqual => return Ok(Value::Bool(false)),
                     _ => {
-                        let message =
-                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+                        let message = format!(
+                            "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}"
+                        );
                         return Err(Error::RunTimeException {
                             message: String::from(message),
                             line: op.line,
@@ -195,7 +283,7 @@ impl<'a> Interpreter<'a> {
                 }
             }
         }
-        let message = "Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}";
+        let message = format!("Wrong Binary Token In {op:?} with {right_expr:?} and {left_expr:?}");
         return Err(Error::RunTimeException {
             message: String::from(message),
             line: op.line,

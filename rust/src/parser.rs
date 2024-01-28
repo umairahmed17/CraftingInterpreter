@@ -1,6 +1,6 @@
 use crate::{
     error::Error,
-    expr::{BinaryOp, Expr, Literal, Stmt, Symbol, UnaryOp},
+    expr::{BinaryOp, Expr, Literal, LogicalOp, Stmt, Symbol, UnaryOp},
     scanner::{self, TokenType},
     Token,
 };
@@ -16,7 +16,7 @@ impl LoxParser {
     }
 
     fn assignment(&mut self) -> Result<Expr, Error> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
         if self.match_one_of(vec![TokenType::Equal]) {
             let equals = &self.tokens[self.current - 1].clone(); // idk what i am doing
             let value = self.assignment()?;
@@ -41,6 +41,26 @@ impl LoxParser {
             expr = Expr::Binary(Box::new(expr), op, Box::new(right));
         }
 
+        return Ok(expr);
+    }
+
+    fn or(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.and()?;
+        while self.match_one_of(vec![TokenType::Or]) {
+            let op = LogicalOp::Or;
+            let right = self.and()?;
+            expr = Expr::Logical(Box::new(expr), op, Box::new(right));
+        }
+        return Ok(expr);
+    }
+
+    fn and(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.equality()?;
+        while self.match_one_of(vec![TokenType::And]) {
+            let op = LogicalOp::And;
+            let right = self.equality()?;
+            expr = Expr::Logical(Box::new(expr), op, Box::new(right));
+        }
         return Ok(expr);
     }
 
@@ -217,10 +237,13 @@ impl LoxParser {
     }
 
     fn statement(&mut self) -> Result<Stmt, Error> {
+        if self.match_one_of(vec![TokenType::If]) {
+            return self.if_statement();
+        }
         if self.match_one_of(vec![TokenType::Print]) {
             return self.print_statement();
         }
-        if self.match_one_of(vec![TokenType::LeftBrace]){
+        if self.match_one_of(vec![TokenType::LeftBrace]) {
             return self.block();
         }
         return self.expr_statement();
@@ -279,9 +302,21 @@ impl LoxParser {
     fn block(&mut self) -> Result<Stmt, Error> {
         let mut statements: Vec<Stmt> = Vec::new();
         while !self.check_type(TokenType::RightBrace) && !self.is_at_end() {
-           statements.push(self.declaration()?);
+            statements.push(self.declaration()?);
         }
         let _ = self.consume(TokenType::RightBrace, "Expect `}` after block");
         return Ok(Stmt::Block(statements));
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt, Error> {
+        let _ = self.consume(TokenType::LeftParen, "Expect `(` after `if`.");
+        let condition = self.expr()?;
+        let _ = self.consume(TokenType::RightParen, "Expect `)` after `if`.");
+        let then_branch = Box::new(self.statement()?);
+        let mut else_branch = None;
+        if self.match_one_of(vec![TokenType::Else]) {
+            else_branch = Some(Box::new(self.statement()?));
+        }
+        return Ok(Stmt::If(condition, then_branch, else_branch));
     }
 }

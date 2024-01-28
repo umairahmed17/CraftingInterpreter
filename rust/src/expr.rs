@@ -14,7 +14,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Variable(Symbol),
     Assign(Symbol, Box<Expr>),
-    // Logical(Box<Expr>, LogicalOp, Box<Expr>),
+    Logical(Box<Expr>, LogicalOp, Box<Expr>),
     // Set(Box<Expr>, Symbol, Box<Expr>),
     // Super(SourceLocation, Symbol),
     // List(Vec<Expr>),
