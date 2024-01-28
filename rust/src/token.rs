@@ -230,7 +230,6 @@ pub struct Lexer<'a> {
 
 impl<'a> Lexer<'a> {
     pub fn scan_content(&'a mut self) -> &Vec<Token> {
-        println!("The length of source is {0}", self.source.len());
         return self.scan_tokens();
     }
 
@@ -251,10 +250,6 @@ impl<'a> Lexer<'a> {
 
     fn scan_token(&mut self) -> () {
         let c = self.advance();
-        println!(
-            "The current character at {0} to be tokenize is: {c}",
-            self.current
-        );
         match c {
             '(' => self
                 .tokens
@@ -383,7 +378,6 @@ impl<'a> Lexer<'a> {
         // }
 
         let text = &self.source[self.start..self.current];
-        println!("The Number Text is: {text:?}");
         self.tokens.push(Token::generate_token(
             TokenType::Number(
                 self.source[self.start..self.current]

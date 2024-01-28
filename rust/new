@@ -1,6 +1,7 @@
-var language = "lox";
-var a = 1 + 2 * 3 / 3;
-print language;
+var a = 2 / 4 + (3 / 3);
 print a;
-language = language + " language";
-print language;
+print a + 0.5;
+var b = a;
+var l = "a";
+print a == b;
+print l + "b";

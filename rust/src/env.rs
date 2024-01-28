@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::DerefMut};
 
 use crate::{
     error::Error,
@@ -50,4 +50,5 @@ impl Environment {
             col: symbol.col,
         });
     }
+
 }
