@@ -57,12 +57,12 @@ impl Environment {
     }
 
     pub fn assign(&mut self, symbol: &Symbol, value: Value) -> Result<(), Error> {
-        if let Some(ref mut enclosing) = self.enclosing {
-            return enclosing.assign(symbol, value);
-        }
         if self.values.contains_key(&symbol.name) {
             *self.values.get_mut(&symbol.name).unwrap() = value;
             return Ok(());
+        }
+        if let Some(ref mut enclosing) = self.enclosing {
+            return enclosing.assign(symbol, value);
         }
         let msg = format!("Undefined Variable `{0}`.", symbol.name);
         return Err(Error::RunTimeException {
@@ -70,5 +70,12 @@ impl Environment {
             line: symbol.line,
             col: symbol.col,
         });
+    }
+
+    pub fn with_enclosing(environment: Environment) -> Environment {
+        return Self {
+            values: HashMap::new(),
+            enclosing: Some(Box::new(environment)),
+        };
     }
 }

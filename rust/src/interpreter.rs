@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     env::Environment,
     error::Error,
@@ -21,75 +19,60 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn evaluate(&mut self, stmt: &Stmt) -> Result<Value, Error> {
+    fn evaluate(&mut self, stmt: &Stmt) -> Result<(), Error> {
         match stmt {
             Stmt::Expr(v) => match self.get_value(v) {
-                Ok(v) => {
-                    return Ok(v);
+                Ok(_) => {
+                    return Ok(());
                 }
                 Err(e) => return Err(e),
             },
             Stmt::Print(v) => {
                 let value = self.get_value(v)?;
                 println!("The value is: {0}", value);
-                return Ok(value.clone());
+                return Ok(());
             }
             Stmt::VarDecl(sym, expr) => match expr {
                 Some(expr) => {
                     let value = self.get_value(expr)?;
                     self.env.define(sym, value.clone());
-                    return Ok(value);
+                    return Ok(());
                 }
                 None => {
-                    return Ok(Value::Nil);
+                    self.env.define(sym, Value::Nil);
+                    return Ok(());
                 }
             },
-            Stmt::Assign(symbol, stmt) => {
-                let value = self.evaluate(stmt)?;
-                let _ = self.env.assign(symbol, value.clone())?;
-                return Ok(value);
-            }
             Stmt::Block(statements) => {
-                let enclosing = Some(Box::new(self.env.clone()));
-                return self.execute_block(
-                    statements,
-                    Environment {
-                        values: HashMap::new(),
-                        enclosing,
-                    },
+                self.env = Environment::with_enclosing(self.env.clone());
+
+                for statement in statements {
+                    let _ = self.evaluate(statement)?;
+                }
+                if let Some(enclosing) = self.env.enclosing.clone() {
+                    self.env = *enclosing;
+                }
+                return Ok(());
+            }
+            Stmt::While(condition, while_stmt) => {
+                println!(
+                    "Condition: {condition:?} And Value: {0:?}",
+                    self.get_value(condition)
                 );
+                while is_truthy(&self.get_value(condition)?)? {
+                    self.evaluate(while_stmt)?;
+                }
+                return Ok(());
             }
             Stmt::If(condition, if_stmt, else_stmt) => {
-                let bool = self.get_value(condition)?;
-                let mut cond = false;
-                match bool {
-                    Value::String(_) => {
-                        let msg = "Cannot cast string to bool";
-                        return Err(Error::JustError {
-                            message: msg.to_string(),
-                        });
-                    }
-                    Value::Number(v) => {
-                        cond = is_truthy(v);
-                    }
-                    Value::Bool(v) => {
-                        cond = v;
-                    }
-                    Value::Nil => {
-                        let msg = "Cannot cast string to bool";
-                        return Err(Error::JustError {
-                            message: msg.to_string(),
-                        });
-                    }
-                }
-                if cond {
+                if is_truthy(&self.get_value(condition)?)? {
                     self.evaluate(if_stmt)?;
                 } else if let Some(else_stmt) = else_stmt {
                     self.evaluate(else_stmt)?;
                 }
-                return Ok(bool);
+                return Ok(());
             }
-            _ => return Ok(Value::Nil),
+            _ => return Ok(()),
         }
     }
 
@@ -129,55 +112,16 @@ impl<'a> Interpreter<'a> {
     ) -> Result<Value, Error> {
         let left = self.get_value(left)?;
         if let LogicalOp::Or = op {
-            match left {
-                Value::String(_) => {
-                    return Err(Error::JustError {
-                        message: String::from("Cannot cast string to bool"),
-                    });
-                }
-                Value::Number(v) => {
-                    if is_truthy(v) {
-                        return Ok(left);
-                    }
-                }
-                Value::Bool(v) => {
-                    if v {
-                        return Ok(left);
-                    }
-                }
-                Value::Nil => {
-                    return Err(Error::JustError {
-                        message: String::from("Nil cannot be casted to bool"),
-                    })
-                }
+            if is_truthy(&left)? {
+                return Ok(left);
             }
         }
         if let LogicalOp::And = op {
-            match left {
-                Value::String(_) => {
-                    return Err(Error::JustError {
-                        message: String::from("Cannot cast string to bool"),
-                    });
-                }
-                Value::Number(v) => {
-                    if !is_truthy(v) {
-                        return Ok(left);
-                    }
-                }
-                Value::Bool(v) => {
-                    if !v {
-                        return Ok(left);
-                    }
-                }
-                Value::Nil => {
-                    return Err(Error::JustError {
-                        message: String::from("Nil cannot be casted to bool"),
-                    })
-                }
+            if !is_truthy(&left)? {
+                return Ok(left);
             }
         }
         return self.get_value(right);
-        Ok(())
     }
 
     fn interpret_unary(&mut self, op: &UnaryOp, right: &Expr) -> Result<Value, Error> {
@@ -195,15 +139,7 @@ impl<'a> Interpreter<'a> {
                 });
             }
             UnaryOpTy::Bang => {
-                if let Value::Number(v) = right {
-                    return Ok(Value::Bool(is_truthy(v)));
-                }
-                let message = "Wrong Unary Token In {op:?} with {expr:?}";
-                return Err(Error::RunTimeException {
-                    message: String::from(message),
-                    line: op.line,
-                    col: op.col,
-                });
+                return Ok(Value::Bool(is_truthy(&right)?));
             }
         }
     }
@@ -299,21 +235,28 @@ impl<'a> Interpreter<'a> {
             col: op.col,
         });
     }
-
-    fn execute_block(&mut self, statements: &[Stmt], env: Environment) -> Result<Value, Error> {
-        let previous = self.env.clone();
-        self.env = env;
-        for statement in statements {
-            let _ = self.evaluate(statement)?;
-        }
-        self.env = previous;
-        return Ok(Value::Nil);
-    }
 }
 
-fn is_truthy(v: f64) -> bool {
-    if v > 0.0 {
-        return true;
+fn is_truthy(val: &Value) -> Result<bool, Error> {
+    match val {
+        Value::String(_) => {
+            return Err(Error::JustError {
+                message: String::from("Cannot cast string to bool"),
+            });
+        }
+        Value::Number(v) => {
+            if *v > 0.0 {
+                return Ok(true);
+            }
+            return Ok(false);
+        }
+        Value::Bool(v) => {
+            return Ok(*v);
+        }
+        Value::Nil => {
+            return Err(Error::JustError {
+                message: String::from("Nil cannot be casted to bool"),
+            })
+        }
     }
-    return false;
 }

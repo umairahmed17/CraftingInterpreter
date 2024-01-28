@@ -237,11 +237,17 @@ impl LoxParser {
     }
 
     fn statement(&mut self) -> Result<Stmt, Error> {
+        if self.match_one_of(vec![TokenType::For]) {
+            return self.for_statement();
+        }
         if self.match_one_of(vec![TokenType::If]) {
             return self.if_statement();
         }
         if self.match_one_of(vec![TokenType::Print]) {
             return self.print_statement();
+        }
+        if self.match_one_of(vec![TokenType::While]) {
+            return self.while_statement();
         }
         if self.match_one_of(vec![TokenType::LeftBrace]) {
             return self.block();
@@ -318,5 +324,52 @@ impl LoxParser {
             else_branch = Some(Box::new(self.statement()?));
         }
         return Ok(Stmt::If(condition, then_branch, else_branch));
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt, Error> {
+        let _ = self.consume(TokenType::LeftParen, "Expect `(` after `if`.");
+        let condition = self.expr()?;
+        let _ = self.consume(TokenType::RightParen, "Expect `)` after `if`.");
+        let while_branch = Box::new(self.statement()?);
+        return Ok(Stmt::While(condition, while_branch));
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt, Error> {
+        let _ = self.consume(TokenType::LeftParen, "Expect `(` after `for`.");
+        let mut initializer: Option<Stmt> = None;
+        if self.match_one_of(vec![TokenType::Semicolon]) {
+            initializer = None;
+        } else if self.match_one_of(vec![TokenType::Var]) {
+            initializer = Some(self.var_declaration()?);
+        } else {
+            initializer = Some(self.expr_statement()?);
+        }
+
+        let mut condition: Option<Expr> = None;
+        if !self.check_type(TokenType::Semicolon) {
+            condition = Some(self.expr()?);
+        }
+        let _ = self.consume(TokenType::Semicolon, "Expect `;` after loop condition.");
+        let mut increment: Option<Expr> = None;
+        if !self.check_type(TokenType::RightParen) {
+            increment = Some(self.expr()?);
+        }
+        let _ = self.consume(TokenType::RightParen, "Expect `)` after for clauses.");
+        let mut body: Stmt = self.statement()?;
+
+        if let Some(expr) = increment {
+            body = Stmt::Block(vec![body, Stmt::Expr(expr)]);
+        }
+
+        if let None = condition {
+            condition = Some(Expr::Literal(Literal::True));
+        }
+        body = Stmt::While(condition.unwrap(), Box::new(body));
+
+        if let Some(_) = initializer {
+            body = Stmt::Block(vec![initializer.unwrap(), body]);
+        }
+
+        return Ok(body);
     }
 }

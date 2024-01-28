@@ -97,7 +97,6 @@ pub enum Stmt {
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Print(Expr),
     VarDecl(Symbol, Option<Expr>),
-    Assign(Symbol, Box<Stmt>),
     Block(Vec<Stmt>),
     Return(SourceLocation, Option<Expr>),
     While(Expr, Box<Stmt>),
