@@ -35,11 +35,32 @@ fn run_file(file: &str) {
 }
 
 fn run_prompt() {
+    let mut environment = Environment {
+        values: HashMap::new(),
+        enclosing: None,
+    };
+
     loop {
         println!("> ");
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
-        run(input);
+        let tokens = scan_tokens(input.clone());
+        match tokens {
+            Ok(tokens) => {
+                let mut parser = LoxParser { tokens, current: 0 };
+                let stmts = parser.parse().unwrap();
+                let mut interpreter = Interpreter {
+                    statements: &stmts,
+                    env: environment.clone(),
+                };
+                if let Err(e) = interpreter.interpret() {
+                    println!("{e:?}");
+                    return;
+                }
+                environment = interpreter.env;
+            }
+            Err(e) => print!("{e:?}\n"),
+        }
     }
 }
 
@@ -53,7 +74,7 @@ fn run(content: String) {
                 statements: &stmts,
                 env: Environment {
                     values: HashMap::new(),
-                    enclosing: None
+                    enclosing: None,
                 },
             };
             if let Err(e) = interpreter.interpret() {
