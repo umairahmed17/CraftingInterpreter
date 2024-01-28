@@ -116,59 +116,68 @@ impl<'a> Interpreter<'a> {
                 return self.env.get(&v);
             }
             Expr::Logical(left, op, right) => {
-                let left = self.get_value(left)?;
-                if let LogicalOp::Or = op {
-                    match left {
-                        Value::String(_) => {
-                            return Err(Error::JustError {
-                                message: String::from("Cannot cast string to bool"),
-                            });
-                        }
-                        Value::Number(v) => {
-                            if is_truthy(v) {
-                                return Ok(left);
-                            }
-                        }
-                        Value::Bool(v) => {
-                            if v {
-                                return Ok(left);
-                            }
-                        }
-                        Value::Nil => {
-                            return Err(Error::JustError {
-                                message: String::from("Nil cannot be casted to bool"),
-                            })
-                        }
-                    }
-                }
-
-                if let LogicalOp::And = op {
-                    match left {
-                        Value::String(_) => {
-                            return Err(Error::JustError {
-                                message: String::from("Cannot cast string to bool"),
-                            });
-                        }
-                        Value::Number(v) => {
-                            if !is_truthy(v) {
-                                return Ok(left);
-                            }
-                        }
-                        Value::Bool(v) => {
-                            if !v {
-                                return Ok(left);
-                            }
-                        }
-                        Value::Nil => {
-                            return Err(Error::JustError {
-                                message: String::from("Nil cannot be casted to bool"),
-                            })
-                        }
-                    }
-                }
-                return self.get_value(right);
+                return self.interpret_logical(left, op, right);
             }
         }
+    }
+
+    fn interpret_logical(
+        &mut self,
+        left: &Box<Expr>,
+        op: &LogicalOp,
+        right: &Box<Expr>,
+    ) -> Result<Value, Error> {
+        let left = self.get_value(left)?;
+        if let LogicalOp::Or = op {
+            match left {
+                Value::String(_) => {
+                    return Err(Error::JustError {
+                        message: String::from("Cannot cast string to bool"),
+                    });
+                }
+                Value::Number(v) => {
+                    if is_truthy(v) {
+                        return Ok(left);
+                    }
+                }
+                Value::Bool(v) => {
+                    if v {
+                        return Ok(left);
+                    }
+                }
+                Value::Nil => {
+                    return Err(Error::JustError {
+                        message: String::from("Nil cannot be casted to bool"),
+                    })
+                }
+            }
+        }
+        if let LogicalOp::And = op {
+            match left {
+                Value::String(_) => {
+                    return Err(Error::JustError {
+                        message: String::from("Cannot cast string to bool"),
+                    });
+                }
+                Value::Number(v) => {
+                    if !is_truthy(v) {
+                        return Ok(left);
+                    }
+                }
+                Value::Bool(v) => {
+                    if !v {
+                        return Ok(left);
+                    }
+                }
+                Value::Nil => {
+                    return Err(Error::JustError {
+                        message: String::from("Nil cannot be casted to bool"),
+                    })
+                }
+            }
+        }
+        return self.get_value(right);
+        Ok(())
     }
 
     fn interpret_unary(&mut self, op: &UnaryOp, right: &Expr) -> Result<Value, Error> {
