@@ -220,6 +220,9 @@ impl LoxParser {
         if self.match_one_of(vec![TokenType::Print]) {
             return self.print_statement();
         }
+        if self.match_one_of(vec![TokenType::LeftBrace]){
+            return self.block();
+        }
         return self.expr_statement();
     }
 
@@ -271,5 +274,14 @@ impl LoxParser {
             "Expect `;` after variable declaration",
         );
         return Ok(Stmt::VarDecl(name, initializer));
+    }
+
+    fn block(&mut self) -> Result<Stmt, Error> {
+        let mut statements: Vec<Stmt> = Vec::new();
+        while !self.check_type(TokenType::RightBrace) && !self.is_at_end() {
+           statements.push(self.declaration()?);
+        }
+        let _ = self.consume(TokenType::RightBrace, "Expect `}` after block");
+        return Ok(Stmt::Block(statements));
     }
 }

@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use clap::Parser;
+
 use crate::{
     env::Environment,
     error::Error,
@@ -28,45 +32,34 @@ impl<'a> Interpreter<'a> {
                 Err(e) => return Err(e),
             },
             Stmt::Print(v) => {
-                if let Expr::Variable(sym) = v {
-                    if self.env.values.contains_key(&sym.name) {
-                        let val = self.env.values.get(&sym.name).unwrap();
-                        println!("The value of variable `{0}` is: {1}", sym.name, val);
-                        return Ok(val.clone());
-                    }
-                    let msg = format!("The variable `{0}` is undefined.", sym.name);
-                    return Err(Error::RunTimeException {
-                        message: msg,
-                        line: sym.line,
-                        col: sym.col,
-                    });
-                }
                 let value = self.get_value(v)?;
                 println!("The value is: {0}", value);
                 return Ok(value.clone());
             }
-            Stmt::VarDecl(sym, expr) => {
-                let mut value = Value::Nil;
-                match expr {
-                    Some(expr) => {
-                        value = self.get_value(expr)?;
-                    }
-                    None => {
-                        return self.env.get(&sym);
-                    }
+            Stmt::VarDecl(sym, expr) => match expr {
+                Some(expr) => {
+                    let value = self.get_value(expr)?;
+                    self.env.define(sym, value.clone());
+                    return Ok(value);
                 }
-                if let Some(expr) = expr {
-                    value = self.get_value(expr)?;
+                None => {
+                    return Ok(Value::Nil);
                 }
-                self.env.define(sym, value.clone());
-                return Ok(value);
-            }
+            },
             Stmt::Assign(symbol, stmt) => {
-                println!("The symbol: {symbol:?}");
                 let value = self.evaluate(stmt)?;
-                println!("The value: {value:?}");
                 let _ = self.env.assign(symbol, value.clone())?;
                 return Ok(value);
+            }
+            Stmt::Block(statements) => {
+                let enclosing = Some(Box::new(self.env.clone()));
+                return self.execute_block(
+                    statements,
+                    Environment {
+                        values: HashMap::new(),
+                        enclosing,
+                    },
+                );
             }
             _ => return Ok(Value::Nil),
         }
@@ -92,18 +85,8 @@ impl<'a> Interpreter<'a> {
                 return Ok(value);
             }
             Expr::Variable(v) => {
-                let msg = format!("Variable: `{0}` is undefined.", v.name);
-
-                if self.env.values.contains_key(&v.name) {
-                    return Ok(self.env.values.get(&v.name).unwrap().clone());
-                }
-                return Err(Error::RunTimeException {
-                    message: msg,
-                    line: v.line,
-                    col: v.col,
-                });
+                return self.env.get(&v);
             }
-            _ => return Ok(Value::Nil),
         }
     }
 
@@ -220,6 +203,16 @@ impl<'a> Interpreter<'a> {
             line: op.line,
             col: op.col,
         });
+    }
+
+    fn execute_block(&mut self, statements: &[Stmt], env: Environment) -> Result<Value, Error> {
+        let previous = self.env.clone();
+        self.env = env;
+        for statement in statements {
+            let _ = self.evaluate(statement)?;
+        }
+        self.env = previous;
+        return Ok(Value::Nil);
     }
 }
 

@@ -53,6 +53,7 @@ fn run(content: String) {
                 statements: &stmts,
                 env: Environment {
                     values: HashMap::new(),
+                    enclosing: None
                 },
             };
             if let Err(e) = interpreter.interpret() {

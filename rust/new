@@ -1,7 +1,19 @@
-var a = 2 / 4 + (3 / 3);
+var a = "global a";
+var b = "global b";
+var c = "global c";
+{
+  var a = "outer a";
+  var b = "outer b";
+  {
+    var a = "inner a";
+    print a;
+    print b;
+    print c;
+  }
+  print a;
+  print b;
+  print c;
+}
 print a;
-print a + 0.5;
-var b = a;
-var l = "a";
-print a == b;
-print l + "b";
+print b;
+print c;
