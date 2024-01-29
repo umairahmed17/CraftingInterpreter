@@ -1,7 +1,9 @@
 use core::{fmt, panic};
-use std::str::FromStr;
 
-use crate::{env::Environment, error::Error, scanner::Token};
+use crate::{
+    interpreter::{self, Callable, Interpreter},
+    scanner::Token,
+};
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -9,7 +11,7 @@ pub enum Expr {
     // This(SourceLocation),
     Unary(UnaryOp, Box<Expr>),
     Binary(Box<Expr>, BinaryOp, Box<Expr>),
-    // Call(Box<Expr>, SourceLocation, Vec<Expr>),
+    Call(Box<Expr>, SourceLocation, Vec<Expr>),
     // Get(Box<Expr>, Symbol),
     Grouping(Box<Expr>),
     Variable(Symbol),
@@ -33,10 +35,18 @@ pub enum Expr {
 }
 
 #[derive(Debug, Clone)]
+pub struct NativeFunction {
+    pub name: String,
+    pub arity: u8,
+    pub callable: fn(&mut Interpreter, &[Value]) -> Result<Value, String>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
     String(String),
     Number(f64),
     Bool(bool),
+    NativeFunction(NativeFunction),
     Nil,
 }
 
@@ -47,9 +57,25 @@ impl fmt::Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Nil => write!(f, "Nil"),
+            Value::NativeFunction(v) => write!(f, "<Native Fn>"),
         }
     }
 }
+
+impl Callable for NativeFunction {
+    fn call(
+        &self,
+        interpreter: &mut interpreter::Interpreter,
+        arguments: &[Value],
+    ) -> Result<Value, String> {
+        return (self.callable)(interpreter, arguments);
+    }
+
+    fn arity(&self, interpreter: &Interpreter) -> u8 {
+        return self.arity;
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SourceLocation {
     pub line: usize,

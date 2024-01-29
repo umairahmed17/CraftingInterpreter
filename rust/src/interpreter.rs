@@ -4,24 +4,39 @@ use std::time::SystemTime;
 use crate::{
     env::Environment,
     error::Error,
-    expr::{BinaryOp, BinaryOpTy, Expr, Literal, LogicalOp, Stmt, UnaryOp, UnaryOpTy, Value},
+    expr::{
+        BinaryOp, BinaryOpTy, Expr, Literal, LogicalOp, NativeFunction, Stmt, Symbol, UnaryOp, UnaryOpTy, Value
+    },
 };
+
+pub trait Callable {
+    fn call(&self, interpreter: &mut Interpreter, arguments: &[Value]) -> Result<Value, String>;
+    fn arity(&self, interpreter: &Interpreter) -> u8;
+}
 
 pub struct Interpreter<'a> {
     pub statements: &'a Vec<Stmt>,
+    pub globals: Environment,
     pub env: Environment,
     loop_stack: Vec<String>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn from_statements(statements: &'a Vec<Stmt>) -> Self {
-        let environment = Environment {
+        let mut globals = Environment {
             values: HashMap::new(),
             enclosing: None,
         };
+        let clock_sym = Symbol {
+            name: "clock".to_string(),
+            line: 0,
+            col: -1,
+        };
+        globals.define(&clock_sym, Value::NativeFunction);
         return Self {
             statements,
-            env: environment,
+            globals: globals.clone(),
+            env: globals,
             loop_stack: vec![],
         };
     }
@@ -124,6 +139,27 @@ impl<'a> Interpreter<'a> {
             Expr::Logical(left, op, right) => {
                 return self.interpret_logical(left, op, right);
             }
+            Expr::Call(callee, location, args) => {
+                let callee = self.get_value(callee)?;
+                let mut arguments = Vec::new();
+                for arg in args {
+                    arguments.push(self.get_value(arg)?);
+                }
+
+                match callee {
+                    Value::NativeFunction => {}
+                    _ => {
+                        return Err(Error::RunTimeException {
+                            message: "Can only call function and classes".to_string(),
+                            line: location.line,
+                            col: location.col,
+                        })
+                    }
+                }
+
+                return callee.call(&self, arguments.as_slice());
+            }
+            _ => return Ok(Value::Nil),
         }
     }
 
@@ -262,11 +298,6 @@ impl<'a> Interpreter<'a> {
 
 fn is_truthy(val: &Value) -> Result<bool, Error> {
     match val {
-        Value::String(_) => {
-            return Err(Error::JustError {
-                message: String::from("Cannot cast string to bool"),
-            });
-        }
         Value::Number(v) => {
             if *v > 0.0 {
                 return Ok(true);
@@ -276,9 +307,9 @@ fn is_truthy(val: &Value) -> Result<bool, Error> {
         Value::Bool(v) => {
             return Ok(*v);
         }
-        Value::Nil => {
+        _ => {
             return Err(Error::JustError {
-                message: String::from("Nil cannot be casted to bool"),
+                message: String::from("{val} cannot be casted to bool"),
             })
         }
     }

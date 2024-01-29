@@ -1,6 +1,6 @@
 use crate::{
     error::Error,
-    expr::{BinaryOp, Expr, Literal, LogicalOp, Stmt, Symbol, UnaryOp},
+    expr::{BinaryOp, Expr, FunDecl, Literal, LogicalOp, SourceLocation, Stmt, Symbol, UnaryOp},
     scanner::{self, TokenType},
     Token,
 };
@@ -159,7 +159,47 @@ impl LoxParser {
             return Ok(Expr::Unary(op, Box::new(right)));
         }
 
-        return self.primary();
+        return self.call();
+    }
+
+    fn call(&mut self) -> Result<Expr, Error> {
+        let mut expr = self.primary();
+
+        loop {
+            if self.match_one_of(vec![TokenType::LeftParen]) {
+                expr = self.finish_call(expr?);
+            } else {
+                break;
+            }
+        }
+
+        return expr;
+    }
+
+    fn finish_call(&mut self, expr: Expr) -> Result<Expr, Error> {
+        let mut args = Vec::new();
+        if !self.check_type(TokenType::RightParen) {
+            loop {
+                if args.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().line,
+                        col: self.peek().col,
+                    });
+                }
+                args.push(self.expr()?);
+                if !self.match_one_of(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let paren = self.consume(TokenType::RightParen, "Expect `)` after arguments")?;
+        let source_location = SourceLocation {
+            line: paren.line,
+            col: paren.col,
+        };
+
+        return Ok(Expr::Call(Box::new(expr), source_location, args));
     }
 
     fn primary(&mut self) -> Result<Expr, Error> {
@@ -301,6 +341,9 @@ impl LoxParser {
     }
 
     fn declaration(&mut self) -> Result<Stmt, Error> {
+        if self.match_one_of(vec![TokenType::Fun]) {
+            return self.function("function");
+        }
         if self.match_one_of(vec![TokenType::Var]) {
             let stmt = self.var_declaration();
             if let Err(_) = stmt {
@@ -404,5 +447,51 @@ impl LoxParser {
 
         self.in_loop = false;
         return Ok(body);
+    }
+
+    fn function(&self, kind: &str) -> Result<Stmt, Error> {
+        let msg = format!("Expect {kind} name.");
+        let name: Symbol = self.consume(TokenType::Identifier, &msg)?.into();
+        let msg = format!("Expect `(` after {kind} name.");
+        let _ = self.consume(TokenType::LeftParen, &msg)?;
+
+        let mut parameters = Vec::new();
+        if !self.check_type(TokenType::RightParen) {
+            loop {
+                if parameters.len() >= 255 {
+                    return Err(Error::TooManyArguments {
+                        line: self.peek().line,
+                        col: self.peek().col,
+                    });
+                }
+
+                parameters.push(
+                    self.consume(TokenType::Identifier, "Expect parameter name.")?
+                        .into(),
+                );
+                if !self.match_one_of(vec![TokenType::Comma]) {
+                    break;
+                }
+            }
+        }
+
+        let _ = self.consume(TokenType::RightParen, "Expect `)` after parameters.");
+        let body = self.block()?;
+        let mut vec_body = vec![];
+        match body {
+            Stmt::Block(v) => vec_body = v,
+            _ => {
+                return Err(Error::JustError {
+                    message: "Something went wrong".to_string(),
+                })
+            }
+        }
+
+        let fun_decl = FunDecl {
+            name,
+            params: parameters,
+            body: vec_body,
+        };
+        return Ok(Stmt::FunDecl(fun_decl));
     }
 }

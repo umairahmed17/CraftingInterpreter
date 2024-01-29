@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use crate::expr::Symbol;
+
 #[derive(Eq, PartialEq, Debug, Copy, Clone)]
 pub enum TokenType {
     // Single-character tokens.
@@ -85,6 +87,16 @@ impl fmt::Debug for Token {
             self.line,
             self.col
         )
+    }
+}
+
+impl Into<Symbol> for Token {
+    fn into(self) -> Symbol {
+        return Symbol {
+            name: String::from_utf8(self.lexeme).unwrap(),
+            line: self.line,
+            col: self.col,
+        };
     }
 }
 
