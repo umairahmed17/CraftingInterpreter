@@ -1,6 +1,8 @@
 use crate::{
     error::Error,
-    expr::{BinaryOp, Expr, FunDecl, Literal, LogicalOp, SourceLocation, Stmt, Symbol, UnaryOp},
+    expr::{
+        BinaryOp, Expr, FunDecl, Literal, LogicalOp, SourceLocation, Stmt, Symbol, UnaryOp, Value,
+    },
     scanner::{self, TokenType},
     Token,
 };
@@ -315,6 +317,9 @@ impl LoxParser {
         if self.match_one_of(vec![TokenType::Print]) {
             return self.print_statement();
         }
+        if self.match_one_of(vec![TokenType::Return]) {
+            return self.return_statement();
+        }
         if self.match_one_of(vec![TokenType::While]) {
             return self.while_statement();
         }
@@ -449,7 +454,7 @@ impl LoxParser {
         return Ok(body);
     }
 
-    fn function(&self, kind: &str) -> Result<Stmt, Error> {
+    fn function(&mut self, kind: &str) -> Result<Stmt, Error> {
         let msg = format!("Expect {kind} name.");
         let name: Symbol = self.consume(TokenType::Identifier, &msg)?.into();
         let msg = format!("Expect `(` after {kind} name.");
@@ -476,6 +481,8 @@ impl LoxParser {
         }
 
         let _ = self.consume(TokenType::RightParen, "Expect `)` after parameters.");
+        let msg = format!("Expect `{{` before {kind} body.");
+        let _ = self.consume(TokenType::LeftBrace, &msg)?;
         let body = self.block()?;
         let mut vec_body = vec![];
         match body {
@@ -493,5 +500,19 @@ impl LoxParser {
             body: vec_body,
         };
         return Ok(Stmt::FunDecl(fun_decl));
+    }
+
+    fn return_statement(&mut self) -> Result<Stmt, Error> {
+        let keyword = &self.tokens[self.current - 1];
+        let source_location = SourceLocation {
+            line: keyword.line,
+            col: keyword.col,
+        };
+        let mut value = None;
+        if !self.check_type(TokenType::Semicolon) {
+            value = Some(self.expr()?);
+        }
+        let _ = self.consume(TokenType::Semicolon, "Expect `;` after return value.")?;
+        return Ok(Stmt::Return(source_location, value));
     }
 }

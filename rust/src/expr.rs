@@ -1,6 +1,8 @@
 use core::{fmt, panic};
+use std::collections::HashMap;
 
 use crate::{
+    env::Environment,
     interpreter::{self, Callable, Interpreter},
     scanner::Token,
 };
@@ -42,12 +44,69 @@ pub struct NativeFunction {
 }
 
 #[derive(Debug, Clone)]
+pub struct LoxFunction {
+    pub declaration: Stmt,
+}
+
+impl Callable for LoxFunction {
+    fn call(&self, interpreter: &mut Interpreter, arguments: &[Value]) -> Result<Value, String> {
+        match &self.declaration {
+            Stmt::FunDecl(fun_decl) => {
+                let args_env: HashMap<_, _> = fun_decl
+                    .params
+                    .iter()
+                    .zip(arguments.iter())
+                    .map(|(param, arg)| (param.name.clone(), arg.clone()))
+                    .collect();
+
+                let saved_env = interpreter.env.clone();
+                let saved_retval = interpreter.ret_val.clone();
+                let mut env = Environment::with_enclosing(saved_env.clone());
+                env.values.extend(args_env);
+
+                let res = interpreter.interpret_block(&fun_decl.body, env);
+
+                match res {
+                    Ok(_) => {
+                        interpreter.env = saved_env;
+                        interpreter.ret_val = saved_retval.clone();
+                        return Ok(Value::Nil);
+                    }
+                    Err(v) => match v {
+                        crate::error::Error::Return { value } => {
+                            interpreter.env = saved_env;
+                            interpreter.ret_val = saved_retval.clone();
+                            return Ok(value);
+                        }
+                        _ => {
+                            return Err("ent Wrong!".to_string());
+                        }
+                    },
+                }
+            }
+            _ => Err("Not a func".to_string()),
+        }
+    }
+
+    fn arity(&self, _: &Interpreter) -> u8 {
+        match &self.declaration {
+            Stmt::FunDecl(fun_decl) => {
+                return fun_decl.params.len() as u8;
+            }
+            _ => return 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Value {
     String(String),
     Number(f64),
     Bool(bool),
     NativeFunction(NativeFunction),
+    LoxFunction(LoxFunction),
     Nil,
+    Undefined
 }
 
 impl fmt::Display for Value {
@@ -57,7 +116,12 @@ impl fmt::Display for Value {
             Value::Number(v) => write!(f, "{}", v),
             Value::Bool(b) => write!(f, "{}", b),
             Value::Nil => write!(f, "Nil"),
-            Value::NativeFunction(v) => write!(f, "<Native Fn>"),
+            Value::Undefined => write!(f, "Undefined"),
+            Value::NativeFunction(_) => write!(f, "<Native Fn>"),
+            Value::LoxFunction(v) => match &v.declaration {
+                Stmt::FunDecl(v) => write!(f, "<fn {} >", v.name.name),
+                _ => write!(f, "Not a function"),
+            },
         }
     }
 }
@@ -71,7 +135,7 @@ impl Callable for NativeFunction {
         return (self.callable)(interpreter, arguments);
     }
 
-    fn arity(&self, interpreter: &Interpreter) -> u8 {
+    fn arity(&self, _: &Interpreter) -> u8 {
         return self.arity;
     }
 }

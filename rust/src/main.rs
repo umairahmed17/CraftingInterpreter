@@ -49,8 +49,8 @@ fn run_prompt() {
             Ok(tokens) => {
                 let mut parser = LoxParser::from_tokens(tokens);
                 let stmts = parser.parse().unwrap();
-                let mut interpreter = Interpreter::from_statements(&stmts);
-                if let Err(e) = interpreter.interpret() {
+                let mut interpreter = Interpreter::default();
+                if let Err(e) = interpreter.interpret(&stmts) {
                     println!("{e:?}");
                     return;
                 }
@@ -67,8 +67,8 @@ fn run(content: String) {
         Ok(tokens) => {
             let mut parser = LoxParser::from_tokens(tokens);
             let stmts = parser.parse().unwrap();
-            let mut interpreter = Interpreter::from_statements(&stmts);
-            if let Err(e) = interpreter.interpret() {
+            let mut interpreter = Interpreter::default();
+            if let Err(e) = interpreter.interpret(&stmts) {
                 println!("{e:?}");
                 return;
             }

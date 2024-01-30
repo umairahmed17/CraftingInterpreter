@@ -1,11 +1,13 @@
-use std::collections::HashMap;
 use std::time::SystemTime;
+use std::{collections::HashMap, time::UNIX_EPOCH};
 
+use crate::expr::LoxFunction;
 use crate::{
     env::Environment,
     error::Error,
     expr::{
-        BinaryOp, BinaryOpTy, Expr, Literal, LogicalOp, NativeFunction, Stmt, Symbol, UnaryOp, UnaryOpTy, Value
+        BinaryOp, BinaryOpTy, Expr, Literal, LogicalOp, NativeFunction, Stmt, Symbol, UnaryOp,
+        UnaryOpTy, Value,
     },
 };
 
@@ -14,15 +16,15 @@ pub trait Callable {
     fn arity(&self, interpreter: &Interpreter) -> u8;
 }
 
-pub struct Interpreter<'a> {
-    pub statements: &'a Vec<Stmt>,
+pub struct Interpreter {
     pub globals: Environment,
     pub env: Environment,
+    pub ret_val: Option<Value>,
     loop_stack: Vec<String>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn from_statements(statements: &'a Vec<Stmt>) -> Self {
+impl Default for Interpreter {
+    fn default() -> Self {
         let mut globals = Environment {
             values: HashMap::new(),
             enclosing: None,
@@ -32,16 +34,31 @@ impl<'a> Interpreter<'a> {
             line: 0,
             col: -1,
         };
-        globals.define(&clock_sym, Value::NativeFunction);
+        let clock = NativeFunction {
+            name: clock_sym.name.clone(),
+            arity: 0,
+            callable: |_, _| {
+                return Ok(Value::Number(
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Time went backwards.")
+                        .as_secs() as f64,
+                ));
+            },
+        };
+        globals.define(&clock_sym, Value::NativeFunction(clock));
         return Self {
-            statements,
             globals: globals.clone(),
             env: globals,
             loop_stack: vec![],
+            ret_val: None,
         };
     }
-    pub fn interpret(&mut self) -> Result<(), Error> {
-        for stmt in self.statements {
+}
+
+impl Interpreter {
+    pub fn interpret(&mut self, stmts: &[Stmt]) -> Result<(), Error> {
+        for stmt in stmts {
             if let Err(res) = self.evaluate(stmt) {
                 return Err(res);
             }
@@ -49,7 +66,7 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn evaluate(&mut self, stmt: &Stmt) -> Result<(), Error> {
+    pub fn evaluate(&mut self, stmt: &Stmt) -> Result<(), Error> {
         match stmt {
             Stmt::Expr(v) => match self.get_value(v) {
                 Ok(_) => {
@@ -69,24 +86,13 @@ impl<'a> Interpreter<'a> {
                     return Ok(());
                 }
                 None => {
-                    self.env.define(sym, Value::Nil);
+                    self.env.define(sym, Value::Undefined);
                     return Ok(());
                 }
             },
             Stmt::Block(statements) => {
-                self.env = Environment::with_enclosing(self.env.clone());
-
-                for statement in statements {
-                    if let Stmt::Break = statement {
-                        self.loop_stack.pop();
-                        break;
-                    }
-                    let _ = self.evaluate(statement)?;
-                }
-                if let Some(enclosing) = self.env.enclosing.clone() {
-                    self.env = *enclosing;
-                }
-                return Ok(());
+                let environment = Environment::with_enclosing(self.env.clone());
+                return self.interpret_block(statements, environment);
             }
             Stmt::While(condition, while_stmt) => {
                 let id = SystemTime::now()
@@ -109,6 +115,21 @@ impl<'a> Interpreter<'a> {
                     self.evaluate(else_stmt)?;
                 }
                 return Ok(());
+            }
+            Stmt::FunDecl(fun) => {
+                let func = LoxFunction {
+                    declaration: Stmt::FunDecl(fun.clone()),
+                };
+                self.env.define(&fun.name, Value::LoxFunction(func));
+                return Ok(());
+            }
+            Stmt::Return(_, expr) => {
+                let mut value = Value::Nil;
+                if let Some(expr) = expr {
+                    value = self.get_value(expr)?;
+                }
+                self.ret_val = Some(value.clone());
+                return Err(Error::Return { value });
             }
             _ => return Ok(()),
         }
@@ -134,6 +155,14 @@ impl<'a> Interpreter<'a> {
                 return Ok(value);
             }
             Expr::Variable(v) => {
+                let value = self.env.get(&v)?;
+                if let Value::Undefined = value {
+                    return Err(Error::UndefinedVariable {
+                        name: v.name.clone(),
+                        line: v.line,
+                        col: v.col,
+                    });
+                }
                 return self.env.get(&v);
             }
             Expr::Logical(left, op, right) => {
@@ -145,9 +174,21 @@ impl<'a> Interpreter<'a> {
                 for arg in args {
                     arguments.push(self.get_value(arg)?);
                 }
-
                 match callee {
-                    Value::NativeFunction => {}
+                    Value::NativeFunction(callee) => {
+                        let res = callee.call(self, arguments.as_slice());
+                        match res {
+                            Ok(v) => Ok(v),
+                            Err(e) => Err(Error::JustError { message: e }),
+                        }
+                    }
+                    Value::LoxFunction(callee) => {
+                        let res = callee.call(self, arguments.as_slice());
+                        match res {
+                            Ok(v) => Ok(v),
+                            Err(e) => Err(Error::JustError { message: e }),
+                        }
+                    }
                     _ => {
                         return Err(Error::RunTimeException {
                             message: "Can only call function and classes".to_string(),
@@ -156,8 +197,6 @@ impl<'a> Interpreter<'a> {
                         })
                     }
                 }
-
-                return callee.call(&self, arguments.as_slice());
             }
             _ => return Ok(Value::Nil),
         }
@@ -293,6 +332,24 @@ impl<'a> Interpreter<'a> {
             line: op.line,
             col: op.col,
         });
+    }
+
+    pub fn interpret_block(&mut self, statements: &[Stmt], env: Environment) -> Result<(), Error> {
+        self.env = env;
+        for statement in statements {
+            if let Stmt::Break = statement {
+                self.loop_stack.pop();
+                break;
+            }
+            let res = self.evaluate(statement);
+            if let Err(e) = res {
+                return Err(e);
+            }
+        }
+        if let Some(enclosing) = self.env.enclosing.clone() {
+            self.env = *enclosing;
+        }
+        return Ok(());
     }
 }
 

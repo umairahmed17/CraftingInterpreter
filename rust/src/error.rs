@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::{expr::Expr, scanner};
+use crate::{
+    expr::{Expr, Value},
+    scanner,
+};
 
 // use std::io::{self, Write};
 //
@@ -69,6 +72,14 @@ pub enum Error {
         message: String,
     },
     BreakNotInLoop {
+        line: usize,
+        col: i64,
+    },
+    Return {
+        value: Value,
+    },
+    UndefinedVariable {
+        name: String,
         line: usize,
         col: i64,
     },
@@ -150,6 +161,10 @@ impl fmt::Debug for Error {
             Error::JustError { message } => write!(f, "Something Went wrong!. {message}"),
             Error::BreakNotInLoop { line, col } => {
                 write!(f, "Break not in loop at line={line},col={col}")
+            }
+            Error::Return { value } => write!(f, "Return: {value}"),
+            Error::UndefinedVariable { name, line, col } => {
+                write!(f, "Undefined variable `{name}` at line={line},col={col}")
             }
         }
     }
