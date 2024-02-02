@@ -2,6 +2,7 @@
 #include "chunk.h"
 #include <stdio.h>
 
+
 static int simpleInstruction(const char *name, int offset) {
   printf("\t%s\n", name);
   return offset + 1;
@@ -25,7 +26,6 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
 int disassembleInstruction(Chunk *chunk, int offset) {
   printf("%04d", offset);
-
   if (offset > 0 && chunk->lines[offset] == chunk->lines[offset - 1]) {
     printf("   | ");
   } else {

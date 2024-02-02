@@ -3,6 +3,9 @@
 #include "value.h"
 #include <stdlib.h>
 
+unsigned int rle_count = 1;
+unsigned int lines_count = 0;
+
 void initChunk(Chunk *chunk) {
   chunk->count = 0;
   chunk->capacity = 0;
@@ -21,7 +24,12 @@ void writeChunk(Chunk *chunk, uint8_t byte, int line) {
   }
 
   chunk->code[chunk->count] = byte;
-  chunk->lines[chunk->count] = line;
+  if (chunk->count != 0 && chunk->lines[chunk->count - 1] == line) {
+    rle_count += 1;
+  }
+  chunk->lines[lines_count++] = rle_count;
+  chunk->lines[lines_count++] = line;
+  rle_count = 1;
   chunk->count++;
 }
 
